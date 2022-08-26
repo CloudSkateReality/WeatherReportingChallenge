@@ -1,0 +1,16 @@
+System:
+  Host: "0.0.0.0"
+  Port: "8081"
+  ClientId: "[client_id here]"
+  ClientSecret: "[client_secret here]"
+  Http:
+    IpInfo:
+      Host: "ipinfo.io"
+      Token: "[token-here]"
+    HrDataApi:
+      Host: "weatherhrdata.us-e2.cloudhub.io"
+    WeatherApi:
+      Host: "api.weatherapi.com"
+      Key: "[key-here]"
+  AutoDiscovery:
+    Id: "[Auto-Discovery Id here]"
