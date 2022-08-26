@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<flow name="GetWeatherReport" doc:id="437f0e75-edaf-435f-a0be-3803ab6b235a" >
+		<try doc:name="Try" doc:id="b0e60fb0-131b-4e3a-99ac-0363d0cf57d2">
+			<http:request method="GET" doc:name="GeoLocateIp" doc:id="becb7305-4e10-48cd-94db-cb0e516b7c53" config-ref="IpInfo" path="#[vars.ClientIp]" target="GeoLocateResult">
+				<http:query-params><![CDATA[#[output application/java
+---
+{
+	"token" : p('System.Http.IpInfo.Token')
+}]]]></http:query-params>
+		</http:request>
+			<error-handler>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="eea39f16-717c-4288-9c0a-1972ed8073f3" >
+					<raise-error doc:name="Invalid IP" doc:id="b2e6ec3b-3e00-4a14-8730-76fdc07ceefa" type="WEATHER:INVALID_IP" />
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Translate State to State Code" doc:id="025116af-7f25-4fc9-b69d-fdab0c8966d9">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="StateCode"><![CDATA[%dw 2.0
+output application/json
+var upperState = upper(vars.GeoLocateResult.region)
+var mapping = {
+    "ALABAMA": "AL",
+    "ALASKA": "AK",
+    "ARIZONA": "AZ",
+    "ARKANSAS": "AR",
+    "ARMED FORCES AFRICA": "AE",
+    "ARMED FORCES AMERICAS": "AA",
+    "ARMED FORCES CANADA": "AE",
+    "ARMED FORCES EUROPE": "AE",
+    "ARMED FORCES MIDDLE EAST": "AE",
+    "ARMED FORCES PACIFIC": "AP",
+    "CALIFORNIA": "CA",
+    "COLORADO": "CO",
+    "CONNECTICUT": "CT",
+    "DELAWARE": "DE",
+    "DISTRICT OF COLUMBIA": "DC",
+    "FLORIDA": "FL",
+    "GEORGIA": "GA",
+    "GUAM": "GU",
+    "HAWAII": "HI",
+    "IDAHO": "ID",
+    "ILLINOIS": "IL",
+    "INDIANA": "IN",
+    "IOWA": "IA",
+    "KANSAS": "KS",
+    "KENTUCKY": "KY",
+    "LOUISIANA": "LA",
+    "MAINE": "ME",
+    "MARSHALL ISLANDS": "MH",
+    "MARYLAND": "MD",
+    "MASSACHUSETTS": "MA",
+    "MICHIGAN": "MI",
+    "MINNESOTA": "MN",
+    "MISSISSIPPI": "MS",
+    "MISSOURI": "MO",
+    "MONTANA": "MT",
+    "NEBRASKA": "NE",
+    "NEVADA": "NV",
+    "NEW HAMPSHIRE": "NH",
+    "NEW JERSEY": "NJ",
+    "NEW MEXICO": "NM",
+    "NEW YORK": "NY",
+    "NORTH CAROLINA": "NC",
+    "NORTH DAKOTA": "ND",
+    "NORTHERN MARIANA ISLAND": "MP",
+    "OHIO": "OH",
+    "OKLAHOMA": "OK",
+    "OREGON": "OR",
+    "PENNSYLVANIA": "PA",
+    "PUERTO RICO": "PR",
+    "RHODE ISLAND": "RI",
+    "SOUTH CAROLINA": "SC",
+    "SOUTH DAKOTA": "SD",
+    "TENNESSEE": "TN",
+    "TEXAS": "TX",
+    "UTAH": "UT",
+    "VERMONT": "VT",
+    "VIRGIN ISLANDS": "VI",
+    "VIRGINIA": "VA",
+    "WASHINGTON": "WA",
+    "WEST VIRGINIA": "WV",
+    "WISCONSIN": "WI",
+    "WYOMING": "WY"
+}
+var filteredMapping = mapping filterObject (value,key) -> key contains upperState
+---
+
+filteredMapping[0]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<http:request method="GET" doc:name="Get Possible Offices" doc:id="50df6c74-24ae-44c7-a4da-08490a05ac88" config-ref="HrDataApi" path="/offices" target="Offices">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"client_id" : p('System.ClientId'),
+	"client_secret": p('System.ClientSecret')
+}]]]></http:headers>
+		</http:request>
+		<choice doc:name="Does the List of Offices Contain the IP's State" doc:id="92f684e7-e560-4bde-9713-3771a5dfb3c8" >
+			<when expression='#[sizeOf (vars.Offices.State default [""] filter (vars.StateCode default 0 contains $)) &gt; 0]'>
+				<ee:transform doc:name="Set Coordinates" doc:id="8e4a39b6-31e4-4821-bdb8-52c3b9ebc3f0">
+					<ee:message>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="Latitude" ><![CDATA[%dw 2.0
+output application/java
+var filteredPayload = vars.Offices filter (value) -> value.State == vars.StateCode
+---
+filteredPayload.Latitude[0]]]></ee:set-variable>
+						<ee:set-variable variableName="Longitude" ><![CDATA[%dw 2.0
+output application/java
+var filteredPayload = vars.Offices filter (value) -> value.State == "CA"
+---
+filteredPayload.Longitude[0]]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<http:request method="GET" doc:name="WeatherApi - Get Current Weather and Forecast" doc:id="73695c7c-e3b0-42eb-ac07-70e73e62ff20" config-ref="WeatherApi" path="/forecast.json">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"key": p('System.Http.WeatherApi.Key'),
+	"q" : vars.Latitude as String ++ "," ++ vars.Longitude as String
+}]]]></http:query-params>
+		</http:request>
+			</when>
+			<otherwise >
+				<raise-error doc:name="Postal Code Unmapped" doc:id="a9d128b5-0e8e-4661-b21c-5a9af69a2d9b" type="WEATHER:UNMAPPED" description="The provided state does not have an office"/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
